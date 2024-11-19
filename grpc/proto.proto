@@ -21,11 +21,12 @@ message Nodes {
     string port = 1;
 }
 
+
 service Replication {
    
    rpc Bid (PlaceBid) returns (BidAcknowledgement) {}; 
    rpc Result (Empty) returns (ShowResult) {};
-   rpc Heartbeat (Empty) returns (Empty) {};
+   rpc Heartbeat (Nodes) returns (Empty) {};
    rpc Update (PlaceBid) returns (Empty) {}; 
    rpc Discover (Empty) returns (Nodes);
 }
