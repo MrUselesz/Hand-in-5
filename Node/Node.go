@@ -54,7 +54,10 @@ func main() {
 
 // this is the code that responds to talkToHost.
 func (s *ReplicationServer) Result(ctx context.Context, req *proto.Empty) (*proto.ShowResult, error) {
-	return &proto.ShowResult{Result: "Loser!"}, nil
+
+	//Show current highest bid and highest bidder Id
+	var resultString = fmt.Sprintf("Current highest bid is %v from bidder %v", s.highestBid, s.highestBidderID)
+	return &proto.ShowResult{Result: resultString}, nil
 }
 
 /* check if relavant later....
@@ -76,11 +79,17 @@ func (s *ReplicationServer) connect(address string) (connection proto.Replicatio
 
 func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*proto.BidAcknowledgement, error) {
 
-	var test [3]string
-	test[0] = "1"
-	test[1] = "2"
-	test[2] = "3"
-	return &proto.BidAcknowledgement{Acknowledgement: "Nemt", Nodeports: test[:]}, nil
+	//Checks if the received bid is the highest and sets it
+	if req.GetBid() > s.highestBid {
+
+		fmt.Printf("Old highest bid was: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
+		s.highestBid = req.GetBid()
+		s.highestBidderID = req.GetId()
+		fmt.Printf("New highest bid is: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
+
+	}
+
+	return &proto.BidAcknowledgement{Acknowledgement: "Nemt", Nodeports: s.NodeAddresses}, nil
 }
 
 // Return its port for the requesting node.
