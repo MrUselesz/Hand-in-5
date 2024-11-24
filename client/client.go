@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -36,8 +37,30 @@ func main() {
 	connecter = Connect()
 
 	for {
-		PlaceBid()
-		Result()
+
+		var command string
+		fmt.Println("Enter your bid, or type 'result' to check the current auction status", newLine)
+		fmt.Scan(&command)
+
+		if command == "result" {
+
+			Result()
+
+		} else {
+
+			var bid, err = strconv.ParseInt(command, 10, 32)
+
+			if err != nil {
+
+				fmt.Println("You messed something up: %v", err)
+
+			} else {
+
+				PlaceBid(int32(bid))
+
+			}
+
+		}
 	}
 }
 
@@ -61,11 +84,9 @@ func Result() {
 }
 
 // Sends the clients new bid, and prints the outcome.
-func PlaceBid() {
+func PlaceBid(enteredBid int32) {
 
-	var enteredBid int32
-	fmt.Scan(&enteredBid)
-	bidAcknowledgement, err := connecter.Bid(context.Background(), &proto.PlaceBid{Id: 1, Bid: enteredBid})
+	bidAcknowledgement, err := connecter.Bid(context.Background(), &proto.PlaceBid{Id: id, Bid: enteredBid})
 	if err != nil {
 		log.Fatalf("failed response on: ", err)
 	}

@@ -79,17 +79,26 @@ func (s *ReplicationServer) connect(address string) (connection proto.Replicatio
 
 func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*proto.BidAcknowledgement, error) {
 
+	var status string
 	//Checks if the received bid is the highest and sets it
 	if req.GetBid() > s.highestBid {
 
 		fmt.Printf("Old highest bid was: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
+
 		s.highestBid = req.GetBid()
 		s.highestBidderID = req.GetId()
+
 		fmt.Printf("New highest bid is: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
+
+		status = "Success!"
+
+	} else {
+
+		status = "Failure, check results"
 
 	}
 
-	return &proto.BidAcknowledgement{Acknowledgement: "Nemt", Nodeports: s.NodeAddresses}, nil
+	return &proto.BidAcknowledgement{Acknowledgement: status, Nodeports: s.NodeAddresses}, nil
 }
 
 // Return its port for the requesting node.
