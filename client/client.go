@@ -7,14 +7,13 @@ import (
 	"log"
 	"os"
 	"runtime"
-	
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 var id int32
-var currentConnection string 
+var currentConnection string
 var ports []string
 var connecter proto.ReplicationClient
 var newLine string
@@ -27,7 +26,7 @@ func main() {
 		newLine = "\n"
 	}
 
-	//calls the openLogFile and set all log outpout to be written into the file. 
+	//calls the openLogFile and set all log outpout to be written into the file.
 	file, err := openLogFile("../mylog.log")
 	if err != nil {
 		log.Fatalf("Not working")
@@ -35,10 +34,14 @@ func main() {
 	log.SetOutput(file)
 
 	connecter = Connect()
-	PlaceBid()
-	Result()
+
+	for {
+		PlaceBid()
+		Result()
+	}
 }
-//open or creates a new log file
+
+// open or creates a new log file
 func openLogFile(path string) (*os.File, error) {
 	logFile, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
@@ -46,20 +49,23 @@ func openLogFile(path string) (*os.File, error) {
 	}
 	return logFile, nil
 }
-//Prints the current state of the auction, and who won or who the higest bidder is. 
+
+// Prints the current state of the auction, and who won or who the higest bidder is.
 func Result() {
 	result, err := connecter.Result(context.Background(), &proto.Empty{})
 	if err != nil {
-		log.Fatalf("failed response on: ", err)
+		log.Fatalf("failed response on: %v", err)
 	}
 
 	fmt.Println(result.Result)
 }
-	
-//Sends the clients new bid, and prints the outcome.
+
+// Sends the clients new bid, and prints the outcome.
 func PlaceBid() {
-	
-	bidAcknowledgement, err := connecter.Bid(context.Background(), &proto.PlaceBid{Id: 1, Bid: 100000000})
+
+	var enteredBid int32
+	fmt.Scan(&enteredBid)
+	bidAcknowledgement, err := connecter.Bid(context.Background(), &proto.PlaceBid{Id: 1, Bid: enteredBid})
 	if err != nil {
 		log.Fatalf("failed response on: ", err)
 	}
@@ -72,6 +78,6 @@ func Connect() (connection proto.ReplicationClient) {
 	if err != nil {
 		log.Fatalf("Not working")
 	}
-	
+
 	return proto.NewReplicationClient(conn)
 }
