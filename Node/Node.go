@@ -225,10 +225,7 @@ func (s *ReplicationServer) start_server() {
 	}()
 
 	for {
-		if len(s.NodeAddresses) != 0 {
-
-			s.InitiateHeartbeat()
-		}
+		s.InitiateHeartbeat()
 
 		fmt.Println("Leader is : " + s.leaderAddress)
 		time.Sleep(10 * time.Second)
