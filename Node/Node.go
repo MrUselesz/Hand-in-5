@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"log"
@@ -88,10 +90,19 @@ func (s *ReplicationServer) Discover(ctx context.Context, req *proto.Empty) (*pr
 
 // Will search through every known port to find living nodes and find its own port.
 func (s *ReplicationServer) FindNodesAndOwnPort() {
+
+	var WG sync.WaitGroup
+
 	for i := 0; i < 5; i++ {
+
+		WG.Add(1)
+
 		portSearch := 5000 + i
 
 		go func() {
+
+			defer WG.Done()
+
 			port := strconv.Itoa(portSearch)
 			port = ":" + port
 			nodeConnect := s.connect(port)
@@ -104,13 +115,16 @@ func (s *ReplicationServer) FindNodesAndOwnPort() {
 			s.NodeAddresses = append(s.NodeAddresses, strings.Trim(response.GetPort(), newLine))
 		}()
 	}
+
 	fmt.Println("Searching for port")
-	time.Sleep(10 * time.Second)
+
+	WG.Wait()
+
 	lowestPort := 5006
 	for i := 0; i < 5; i++ {
 		currentPort := 5000 + i
 
-		if Contains(s.NodeAddresses, ":" + strconv.Itoa(currentPort)) == false {
+		if Contains(s.NodeAddresses, ":"+strconv.Itoa(currentPort)) == false {
 			if currentPort < lowestPort {
 				lowestPort = currentPort
 			}
@@ -125,6 +139,69 @@ func (s *ReplicationServer) FindNodesAndOwnPort() {
 	fmt.Println("Your port is ", lowestPort)
 	fmt.Println(s.NodeAddresses)
 
+}
+
+func (s *ReplicationServer) InitiateHeartbeat() {
+
+	var WG sync.WaitGroup
+
+	for i := 0; i < len(s.NodeAddresses); i++ {
+
+		WG.Add(1)
+
+		go func() {
+
+			defer WG.Done()
+
+			nodeConnect := s.connect(s.NodeAddresses[i])
+			fmt.Println("Checking if " + s.NodeAddresses[i] + " is alive lol")
+			_, err := nodeConnect.Heartbeat(context.Background(), &proto.Nodes{Port: s.ownAddress})
+			if err != nil {
+
+				if i != len(s.NodeAddresses)-1 {
+
+					s.NodeAddresses = append(s.NodeAddresses[:i], s.NodeAddresses[i+1:]...)
+
+				} else {
+
+					s.NodeAddresses = s.NodeAddresses[:i]
+				}
+
+				return
+			}
+
+		}()
+
+	}
+
+	WG.Wait()
+
+	if !Contains(s.NodeAddresses, s.leaderAddress) {
+
+		sort.Strings(s.NodeAddresses)
+
+		if len(s.NodeAddresses) == 0 || s.NodeAddresses[0] >= s.ownAddress {
+			s.leaderAddress = s.ownAddress
+			s.isLeader = true
+		} else {
+			s.leaderAddress = s.NodeAddresses[0]
+
+		}
+
+	}
+
+}
+
+func (s *ReplicationServer) Heartbeat(ctx context.Context, req *proto.Nodes) (*proto.Empty, error) {
+
+	if !Contains(s.NodeAddresses, strings.Trim(req.GetPort(), newLine)) {
+
+		s.NodeAddresses = append(s.NodeAddresses, req.GetPort())
+		fmt.Println("Appended a node " + req.GetPort() + " to my known addresses")
+
+	}
+
+	return &proto.Empty{}, nil
 }
 
 // starts the server.
@@ -147,7 +224,16 @@ func (s *ReplicationServer) start_server() {
 		}
 	}()
 
-	time.Sleep(1 * time.Hour)
+	for {
+		if len(s.NodeAddresses) != 0 {
+
+			s.InitiateHeartbeat()
+		}
+
+		fmt.Println("Leader is : " + s.leaderAddress)
+		time.Sleep(10 * time.Second)
+
+	}
 
 }
 
