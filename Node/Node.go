@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"log"
 	"net"
@@ -53,27 +54,17 @@ func main() {
 
 }
 
-// this is the code that responds to talkToHost.
 func (s *ReplicationServer) Result(ctx context.Context, req *proto.Empty) (*proto.ShowResult, error) {
 
-	if !s.isLeader {
+	var resultString string
 
-		nodeConnect := s.connect(s.leaderAddress)
+	if !s.auctionOver {
 
-		update, err := nodeConnect.Update(context.Background(), &proto.Empty{})
-		if err != nil {
-
-			fmt.Println("Error getting updates from leader")
-
-		}
-
-		s.highestBidderID = update.GetId()
-		s.highestBid = update.GetBid()
-
+		//Show current highest bid and highest bidder Id
+		resultString = fmt.Sprintf("Current highest bid is %v from bidder %v", s.highestBid, s.highestBidderID)
+	} else {
+		resultString = fmt.Sprintf("The auction is over! Winner is ID %v with the amount %v", s.highestBidderID, s.highestBid)
 	}
-
-	//Show current highest bid and highest bidder Id
-	var resultString = fmt.Sprintf("Current highest bid is %v from bidder %v", s.highestBid, s.highestBidderID)
 	return &proto.ShowResult{Result: resultString, Nodeports: s.NodeAddresses}, nil
 }
 
@@ -96,72 +87,75 @@ func (s *ReplicationServer) connect(address string) (connection proto.Replicatio
 
 func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*proto.BidAcknowledgement, error) {
 
+	var status string
+
+	var bidderId int32
 	if !s.isLeader {
 
 		nodeConnect := s.connect(s.leaderAddress)
-		acknowledgement, err := nodeConnect.Bid(context.Background(), req)
+		_, err := nodeConnect.Bid(context.Background(), req)
 		if err != nil {
 
 			fmt.Println("Error forwarding bid to leader")
-			return acknowledgement, err
+			status = "Lost connection, please try again"
+		}
+	} else {
+
+		//In case of new, unregistered bidder, gives it a new ID
+		if req.GetId() == 0 {
+
+			bidderId = s.biddersAmount + 1
+			s.biddersAmount++
+			fmt.Printf("Unknown bidder, registering new bidder with ID %v %v", bidderId, newLine)
+
+		} else {
+
+			bidderId = req.GetId()
 
 		}
 
-		update, err := nodeConnect.Update(context.Background(), &proto.Empty{})
-		if err != nil {
+		//Checks if the received bid is the highest and sets it
 
-			fmt.Println("Error getting updates from leader")
-			return acknowledgement, err
+		if req.GetBid() > s.highestBid {
+
+			fmt.Printf("Old highest bid was: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
+
+			s.highestBid = req.GetBid()
+			s.highestBidderID = bidderId
+
+			fmt.Printf("New highest bid is: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
+
+			status = "Success!"
+
+			for _, addresses := range s.NodeAddresses {
+
+				nodeConnect := s.connect(addresses)
+
+				_, err := nodeConnect.Update(context.Background(), &proto.PlaceBid{Id: bidderId, Bid: req.GetBid()})
+				if err != nil {
+
+					fmt.Println("Error getting updates from leader")
+
+				}
+
+			}
+
+		} else {
+
+			status = "Failure, bid too low. Check results by typing 'result'"
 
 		}
-
-		s.highestBidderID = update.GetId()
-		s.highestBid = update.GetBid()
-
-		return acknowledgement, nil
-
-	}
-
-	var status string
-	var bidderId int32
-
-	//In case of new, unregistered bidder, gives it a new ID
-	if req.GetId() == 0 {
-
-		bidderId = s.biddersAmount + 1
-		s.biddersAmount++
-		fmt.Printf("Unknown bidder, registering new bidder with ID %v %v", bidderId, newLine)
-
-	} else {
-
-		bidderId = req.GetId()
-
-	}
-
-	//Checks if the received bid is the highest and sets it
-	if req.GetBid() > s.highestBid {
-
-		fmt.Printf("Old highest bid was: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
-
-		s.highestBid = req.GetBid()
-		s.highestBidderID = bidderId
-
-		fmt.Printf("New highest bid is: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
-
-		status = "Success!"
-
-	} else {
-
-		status = "Failure, bid too low.Check results by typing 'result'"
 
 	}
 
 	return &proto.BidAcknowledgement{Acknowledgement: status, Nodeports: s.NodeAddresses, RegisteredId: bidderId}, nil
 }
 
-func (s *ReplicationServer) Update(ctx context.Context, req *proto.Empty) (*proto.PlaceBid, error) {
+func (s *ReplicationServer) Update(ctx context.Context, req *proto.PlaceBid) (*proto.Empty, error) {
 
-	return &proto.PlaceBid{Id: s.highestBidderID, Bid: s.highestBid}, nil
+	s.highestBid = req.GetBid()
+	s.highestBidderID = req.GetId()
+	return &proto.Empty{}, nil
 
 }
 
@@ -272,22 +266,6 @@ func (s *ReplicationServer) InitiateHeartbeat() {
 
 	}
 
-	if !s.isLeader {
-
-		nodeConnect := s.connect(s.leaderAddress)
-
-		update, err := nodeConnect.Update(context.Background(), &proto.Empty{})
-		if err != nil {
-
-			fmt.Println("Error getting updates from leader")
-
-		}
-
-		s.highestBidderID = update.GetId()
-		s.highestBid = update.GetBid()
-
-	}
-
 }
 
 func (s *ReplicationServer) Heartbeat(ctx context.Context, req *proto.Nodes) (*proto.Empty, error) {
@@ -329,6 +307,7 @@ func (s *ReplicationServer) start_server() {
 		s.InitiateHeartbeat()
 
 		fmt.Println("Leader is : " + s.leaderAddress)
+		time.Sleep(1 * time.Second)
 
 	}
 
