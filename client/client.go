@@ -114,8 +114,11 @@ func PlaceBid(enteredBid int32) {
 	}
 
 	//Sets its new id if it does not have one yet
-	id = bidAcknowledgement.GetRegisteredId()
-	fmt.Printf("You have been assigned an ID! %v", newLine)
+	if id == 0 {
+		id = bidAcknowledgement.GetRegisteredId()
+		fmt.Printf("You have been assigned an ID! %v", newLine)
+
+	}
 
 	for _, port := range bidAcknowledgement.GetNodeports() {
 
@@ -126,6 +129,7 @@ func PlaceBid(enteredBid int32) {
 		}
 
 	}
+
 	fmt.Printf("Reminder that your ID is %v %v", id, newLine)
 
 	fmt.Println(bidAcknowledgement.Acknowledgement, " ", ports)

@@ -21,6 +21,7 @@ message ShowResult {
 
 message Nodes {
     string port = 1;
+    int64 timeStamp = 2;
 }
 
 

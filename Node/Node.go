@@ -29,9 +29,9 @@ type ReplicationServer struct {
 	biddersAmount   int32
 	highestBidderID int32
 	highestBid      int32
-	auctionOver     bool //false ongoing true it's over
+	auctionStarted  bool // False on start, gets set to true once when first leader is initialized
 	isLeader        bool
-	timeRemaining   int //Remaining time of the auction in seconds
+	endTime         int64 //Remaining time of the auction in seconds
 }
 
 var newLine string
@@ -58,7 +58,7 @@ func (s *ReplicationServer) Result(ctx context.Context, req *proto.Empty) (*prot
 
 	var resultString string
 
-	if !s.auctionOver {
+	if time.Now().Unix() < s.endTime {
 
 		//Show current highest bid and highest bidder Id
 		resultString = fmt.Sprintf("Current highest bid is %v from bidder %v", s.highestBid, s.highestBidderID)
@@ -88,17 +88,25 @@ func (s *ReplicationServer) connect(address string) (connection proto.Replicatio
 func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*proto.BidAcknowledgement, error) {
 
 	var status string
+	if time.Now().Unix() >= s.endTime {
 
+		status = fmt.Sprintf("The auction is over")
+		return &proto.BidAcknowledgement{Acknowledgement: status}, nil
+
+	}
 	var bidderId int32
 	if !s.isLeader {
 
 		nodeConnect := s.connect(s.leaderAddress)
-		_, err := nodeConnect.Bid(context.Background(), req)
+		response, err := nodeConnect.Bid(context.Background(), req)
 		if err != nil {
 
 			fmt.Println("Error forwarding bid to leader")
 			status = "Lost connection, please try again"
 		}
+
+		return &proto.BidAcknowledgement{Acknowledgement: response.GetAcknowledgement(), Nodeports: response.GetNodeports(), RegisteredId: response.GetRegisteredId()}, nil
+
 	} else {
 
 		//In case of new, unregistered bidder, gives it a new ID
@@ -161,7 +169,8 @@ func (s *ReplicationServer) Update(ctx context.Context, req *proto.PlaceBid) (*p
 
 // Return its port for the requesting node.
 func (s *ReplicationServer) Discover(ctx context.Context, req *proto.Empty) (*proto.Nodes, error) {
-	return &proto.Nodes{Port: s.ownAddress}, nil
+
+	return &proto.Nodes{Port: s.ownAddress, TimeStamp: s.endTime}, nil
 }
 
 // Will search through every known port to find living nodes and find its own port.
@@ -189,6 +198,11 @@ func (s *ReplicationServer) FindNodesAndOwnPort() {
 			}
 			fmt.Printf("Found existing port %v %v", response.GetPort(), newLine)
 			s.NodeAddresses = append(s.NodeAddresses, strings.Trim(response.GetPort(), newLine))
+
+			if response.GetTimeStamp() != 0 {
+				s.endTime = response.GetTimeStamp()
+			}
+
 		}()
 	}
 
@@ -255,6 +269,13 @@ func (s *ReplicationServer) InitiateHeartbeat() {
 	if !Contains(s.NodeAddresses, s.leaderAddress) {
 
 		sort.Strings(s.NodeAddresses)
+
+		if !s.auctionStarted {
+
+			s.auctionStarted = true
+			s.endTime = time.Now().Add(2 * time.Minute).Unix()
+
+		}
 
 		if len(s.NodeAddresses) == 0 || s.NodeAddresses[0] >= s.ownAddress {
 			s.leaderAddress = s.ownAddress
