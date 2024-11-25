@@ -38,7 +38,7 @@ func main() {
 	fmt.Scan(&currentConnection)
 	currentConnection = ":" + currentConnection
 	ports = append(ports, currentConnection)
-	fmt.Println(ports)
+	//fmt.Println(ports)
 
 	for {
 
@@ -50,7 +50,8 @@ func main() {
 
 		if connecter == nil {
 
-			fmt.Println("All known servers down, call an ambulance")
+			fmt.Println("All known servers down")
+			log.Fatal("All known servers down")
 			break
 		}
 
@@ -102,7 +103,10 @@ func Result() {
 
 	}
 
+	fmt.Printf("Reminder that your ID is %v %v", id, newLine)
+
 	fmt.Println(result.Result, ports)
+	log.Printf("Client %v asked for auction result and got the message: %v", id, result.GetResult())
 }
 
 // Sends the clients new bid, and prints the outcome.
@@ -113,11 +117,13 @@ func PlaceBid(enteredBid int32) {
 		log.Fatalf("failed response on: ", err)
 	}
 
+	log.Printf("Client %v made a bid of %v through port %v", id, enteredBid, currentConnection)
+
 	//Sets its new id if it does not have one yet
 	if id == 0 {
 		id = bidAcknowledgement.GetRegisteredId()
 		fmt.Printf("You have been assigned an ID! %v", newLine)
-
+		log.Printf("Registered new node with ID %v %v", id, newLine)
 	}
 
 	for _, port := range bidAcknowledgement.GetNodeports() {
@@ -132,7 +138,8 @@ func PlaceBid(enteredBid int32) {
 
 	fmt.Printf("Reminder that your ID is %v %v", id, newLine)
 
-	fmt.Println(bidAcknowledgement.Acknowledgement, " ", ports)
+	fmt.Println(bidAcknowledgement.Acknowledgement)
+	log.Printf("Client %v bid resulted in : %v", id, bidAcknowledgement.GetAcknowledgement())
 }
 
 func Connect() (connection proto.ReplicationClient) {
@@ -140,9 +147,9 @@ func Connect() (connection proto.ReplicationClient) {
 	for addressIndex, address := range ports {
 
 		address = "localhost" + address
-		fmt.Println("Address here is", address)
 
-		fmt.Println("Tryna connect to", address)
+		fmt.Println("Trying to connect to", address)
+		log.Println("Trying to connect to", address)
 		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 		client := proto.NewReplicationClient(conn)
@@ -151,7 +158,8 @@ func Connect() (connection proto.ReplicationClient) {
 
 		if err != nil {
 
-			fmt.Printf("Could not connect to address %v, trying next known %v", address, newLine)
+			fmt.Printf("Could not connect to port %v, trying next known port %v", address, newLine)
+			log.Printf("Could not connect to port %v, trying next known port %v", address, newLine)
 
 			if addressIndex != len(ports)-1 {
 
@@ -166,13 +174,15 @@ func Connect() (connection proto.ReplicationClient) {
 
 		}
 
-		fmt.Printf("Connected to server %v ! %v", address, newLine)
+		fmt.Printf("Client %v Connected to server %v ! %v", id, address, newLine)
+		log.Printf("Client %v Connected to server %v ! %v", id, address, newLine)
 
 		return client
 
 	}
 
-	fmt.Println("Could not connect to any addresses")
+	fmt.Println("Could not connect to any ports")
+	log.Printf("Client %v could not connect to any port %v", id, newLine)
 	return nil
 
 }

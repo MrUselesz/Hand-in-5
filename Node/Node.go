@@ -91,6 +91,7 @@ func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*prot
 	if time.Now().Unix() >= s.endTime {
 
 		status = fmt.Sprintf("The auction is over")
+		log.Println("THE AUCTION ENDS!")
 		return &proto.BidAcknowledgement{Acknowledgement: status}, nil
 
 	}
@@ -225,9 +226,8 @@ func (s *ReplicationServer) FindNodesAndOwnPort() {
 		return
 	} else {
 		s.ownAddress = ":" + strconv.Itoa(lowestPort)
+		log.Println("Initialized node with port ", s.ownAddress)
 	}
-	fmt.Println("Your port is ", lowestPort)
-	fmt.Println(s.NodeAddresses)
 
 }
 
