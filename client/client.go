@@ -91,6 +91,16 @@ func PlaceBid(enteredBid int32) {
 		log.Fatalf("failed response on: ", err)
 	}
 
+	if id == 0 {
+
+		//Sets its new id if it does not have one yet
+		id = bidAcknowledgement.GetRegisteredId()
+		fmt.Printf("You have been assigned an ID! %v", newLine)
+
+	}
+
+	fmt.Printf("Reminder that your ID is %v %v", id, newLine)
+
 	fmt.Println(bidAcknowledgement.Acknowledgement, " ", bidAcknowledgement.Nodeports)
 }
 

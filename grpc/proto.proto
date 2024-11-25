@@ -12,6 +12,7 @@ message PlaceBid {
 message BidAcknowledgement {
     string acknowledgement = 1;
     repeated string Nodeports = 2;
+    int32 registeredId = 3;
 }
 message ShowResult {
     string Result = 1;

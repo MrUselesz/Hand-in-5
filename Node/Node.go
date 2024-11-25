@@ -26,6 +26,7 @@ type ReplicationServer struct {
 	ownAddress      string
 	leaderAddress   string
 	NodeAddresses   []string
+	biddersAmount   int32
 	highestBidderID int32
 	highestBid      int32
 	auctionState    bool //false over true is ongoing
@@ -80,13 +81,28 @@ func (s *ReplicationServer) connect(address string) (connection proto.Replicatio
 func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*proto.BidAcknowledgement, error) {
 
 	var status string
+	var bidderId int32
+
+	//In case of new, unregistered bidder, gives it a new ID
+	if req.GetId() == 0 {
+
+		bidderId = s.biddersAmount + 1
+		s.biddersAmount++
+		fmt.Printf("Unknown bidder, registering new bidder with ID %v %v", bidderId, newLine)
+
+	} else {
+
+		bidderId = req.GetId()
+
+	}
+
 	//Checks if the received bid is the highest and sets it
 	if req.GetBid() > s.highestBid {
 
 		fmt.Printf("Old highest bid was: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
 
 		s.highestBid = req.GetBid()
-		s.highestBidderID = req.GetId()
+		s.highestBidderID = bidderId
 
 		fmt.Printf("New highest bid is: %v from : %v %v", s.highestBid, s.highestBidderID, newLine)
 
@@ -94,11 +110,11 @@ func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*prot
 
 	} else {
 
-		status = "Failure, check results"
+		status = "Failure, bid too low.Check results by typing 'result'"
 
 	}
 
-	return &proto.BidAcknowledgement{Acknowledgement: status, Nodeports: s.NodeAddresses}, nil
+	return &proto.BidAcknowledgement{Acknowledgement: status, Nodeports: s.NodeAddresses, RegisteredId: bidderId}, nil
 }
 
 // Return its port for the requesting node.
