@@ -15,7 +15,7 @@ import (
 
 var id int32
 var currentConnection string
-var ports []string
+var ports = []string{":5000"}
 var connecter proto.ReplicationClient
 var newLine string
 
@@ -34,13 +34,21 @@ func main() {
 	}
 	log.SetOutput(file)
 
-	connecter = Connect()
-
 	for {
 
 		var command string
 		fmt.Println("Enter your bid, or type 'result' to check the current auction status", newLine)
 		fmt.Scan(&command)
+
+		connecter = Connect()
+
+		if connecter == nil {
+
+			fmt.Println("All servers down, call an ambulance")
+			break
+		}
+
+		fmt.Println("I made it this far")
 
 		if command == "result" {
 
@@ -99,16 +107,39 @@ func PlaceBid(enteredBid int32) {
 
 	}
 
+	ports = bidAcknowledgement.GetNodeports()
+
 	fmt.Printf("Reminder that your ID is %v %v", id, newLine)
 
-	fmt.Println(bidAcknowledgement.Acknowledgement, " ", bidAcknowledgement.Nodeports)
+	fmt.Println(bidAcknowledgement.Acknowledgement, " ", ports)
 }
 
 func Connect() (connection proto.ReplicationClient) {
-	conn, err := grpc.NewClient("localhost:5000", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Not working")
+
+	for _, address := range ports {
+
+		address = "localhost" + address
+		fmt.Println("Tryna connect to", address)
+		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+		client := proto.NewReplicationClient(conn)
+
+		_, err = client.Discover(context.Background(), &proto.Empty{})
+
+		if err != nil {
+
+			fmt.Printf("Could not connect to address %v, trying next known %v", address, newLine)
+			continue
+
+		}
+
+		fmt.Printf("Connected to server %v ! %v", address, newLine)
+
+		return client
+
 	}
 
-	return proto.NewReplicationClient(conn)
+	fmt.Println("Could not connect to any addresses")
+	return nil
+
 }

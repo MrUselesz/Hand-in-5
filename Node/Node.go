@@ -56,6 +56,22 @@ func main() {
 // this is the code that responds to talkToHost.
 func (s *ReplicationServer) Result(ctx context.Context, req *proto.Empty) (*proto.ShowResult, error) {
 
+	if !s.isLeader {
+
+		nodeConnect := s.connect(s.leaderAddress)
+
+		update, err := nodeConnect.Update(context.Background(), &proto.Empty{})
+		if err != nil {
+
+			fmt.Println("Error getting updates from leader")
+
+		}
+
+		s.highestBidderID = update.GetId()
+		s.highestBid = update.GetBid()
+
+	}
+
 	//Show current highest bid and highest bidder Id
 	var resultString = fmt.Sprintf("Current highest bid is %v from bidder %v", s.highestBid, s.highestBidderID)
 	return &proto.ShowResult{Result: resultString}, nil
@@ -79,6 +95,32 @@ func (s *ReplicationServer) connect(address string) (connection proto.Replicatio
 }
 
 func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*proto.BidAcknowledgement, error) {
+
+	if !s.isLeader {
+
+		nodeConnect := s.connect(s.leaderAddress)
+		acknowledgement, err := nodeConnect.Bid(context.Background(), req)
+		if err != nil {
+
+			fmt.Println("Error forwarding bid to leader")
+			return acknowledgement, err
+
+		}
+
+		update, err := nodeConnect.Update(context.Background(), &proto.Empty{})
+		if err != nil {
+
+			fmt.Println("Error getting updates from leader")
+			return acknowledgement, err
+
+		}
+
+		s.highestBidderID = update.GetId()
+		s.highestBid = update.GetBid()
+
+		return acknowledgement, nil
+
+	}
 
 	var status string
 	var bidderId int32
@@ -115,6 +157,12 @@ func (s *ReplicationServer) Bid(ctx context.Context, req *proto.PlaceBid) (*prot
 	}
 
 	return &proto.BidAcknowledgement{Acknowledgement: status, Nodeports: s.NodeAddresses, RegisteredId: bidderId}, nil
+}
+
+func (s *ReplicationServer) Update(ctx context.Context, req *proto.Empty) (*proto.PlaceBid, error) {
+
+	return &proto.PlaceBid{Id: s.highestBidderID, Bid: s.highestBid}, nil
+
 }
 
 // Return its port for the requesting node.

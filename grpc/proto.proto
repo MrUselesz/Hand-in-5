@@ -28,7 +28,7 @@ service Replication {
    rpc Bid (PlaceBid) returns (BidAcknowledgement) {}; 
    rpc Result (Empty) returns (ShowResult) {};
    rpc Heartbeat (Nodes) returns (Empty) {};
-   rpc Update (PlaceBid) returns (Empty) {}; 
+   rpc Update (Empty) returns (PlaceBid) {}; 
    rpc Discover (Empty) returns (Nodes);
 }
 

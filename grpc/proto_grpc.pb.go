@@ -33,7 +33,7 @@ type ReplicationClient interface {
 	Bid(ctx context.Context, in *PlaceBid, opts ...grpc.CallOption) (*BidAcknowledgement, error)
 	Result(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ShowResult, error)
 	Heartbeat(ctx context.Context, in *Nodes, opts ...grpc.CallOption) (*Empty, error)
-	Update(ctx context.Context, in *PlaceBid, opts ...grpc.CallOption) (*Empty, error)
+	Update(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PlaceBid, error)
 	Discover(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Nodes, error)
 }
 
@@ -75,9 +75,9 @@ func (c *replicationClient) Heartbeat(ctx context.Context, in *Nodes, opts ...gr
 	return out, nil
 }
 
-func (c *replicationClient) Update(ctx context.Context, in *PlaceBid, opts ...grpc.CallOption) (*Empty, error) {
+func (c *replicationClient) Update(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PlaceBid, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(PlaceBid)
 	err := c.cc.Invoke(ctx, Replication_Update_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ type ReplicationServer interface {
 	Bid(context.Context, *PlaceBid) (*BidAcknowledgement, error)
 	Result(context.Context, *Empty) (*ShowResult, error)
 	Heartbeat(context.Context, *Nodes) (*Empty, error)
-	Update(context.Context, *PlaceBid) (*Empty, error)
+	Update(context.Context, *Empty) (*PlaceBid, error)
 	Discover(context.Context, *Empty) (*Nodes, error)
 	mustEmbedUnimplementedReplicationServer()
 }
@@ -123,7 +123,7 @@ func (UnimplementedReplicationServer) Result(context.Context, *Empty) (*ShowResu
 func (UnimplementedReplicationServer) Heartbeat(context.Context, *Nodes) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
-func (UnimplementedReplicationServer) Update(context.Context, *PlaceBid) (*Empty, error) {
+func (UnimplementedReplicationServer) Update(context.Context, *Empty) (*PlaceBid, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
 func (UnimplementedReplicationServer) Discover(context.Context, *Empty) (*Nodes, error) {
@@ -205,7 +205,7 @@ func _Replication_Heartbeat_Handler(srv interface{}, ctx context.Context, dec fu
 }
 
 func _Replication_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PlaceBid)
+	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func _Replication_Update_Handler(srv interface{}, ctx context.Context, dec func(
 		FullMethod: Replication_Update_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ReplicationServer).Update(ctx, req.(*PlaceBid))
+		return srv.(ReplicationServer).Update(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
