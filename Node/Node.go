@@ -140,12 +140,12 @@ func (s *ReplicationServer) FindNodesAndOwnPort() {
 			port := strconv.Itoa(portSearch)
 			port = ":" + port
 			nodeConnect := s.connect(port)
-			fmt.Println(port)
+			fmt.Printf("Checking port %v %v", port, newLine)
 			response, err := nodeConnect.Discover(context.Background(), &proto.Empty{})
 			if err != nil {
 				return
 			}
-			fmt.Println("port is ", response.GetPort())
+			fmt.Printf("Found existing port %v %v", response.GetPort(), newLine)
 			s.NodeAddresses = append(s.NodeAddresses, strings.Trim(response.GetPort(), newLine))
 		}()
 	}
