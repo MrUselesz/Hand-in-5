@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"log"
 	"net"
@@ -29,8 +28,9 @@ type ReplicationServer struct {
 	biddersAmount   int32
 	highestBidderID int32
 	highestBid      int32
-	auctionState    bool //false over true is ongoing
+	auctionOver     bool //false ongoing true it's over
 	isLeader        bool
+	timeRemaining   int //Remaining time of the auction in seconds
 }
 
 var newLine string
@@ -74,7 +74,7 @@ func (s *ReplicationServer) Result(ctx context.Context, req *proto.Empty) (*prot
 
 	//Show current highest bid and highest bidder Id
 	var resultString = fmt.Sprintf("Current highest bid is %v from bidder %v", s.highestBid, s.highestBidderID)
-	return &proto.ShowResult{Result: resultString}, nil
+	return &proto.ShowResult{Result: resultString, Nodeports: s.NodeAddresses}, nil
 }
 
 /* check if relavant later....
@@ -272,6 +272,22 @@ func (s *ReplicationServer) InitiateHeartbeat() {
 
 	}
 
+	if !s.isLeader {
+
+		nodeConnect := s.connect(s.leaderAddress)
+
+		update, err := nodeConnect.Update(context.Background(), &proto.Empty{})
+		if err != nil {
+
+			fmt.Println("Error getting updates from leader")
+
+		}
+
+		s.highestBidderID = update.GetId()
+		s.highestBid = update.GetBid()
+
+	}
+
 }
 
 func (s *ReplicationServer) Heartbeat(ctx context.Context, req *proto.Nodes) (*proto.Empty, error) {
@@ -279,6 +295,7 @@ func (s *ReplicationServer) Heartbeat(ctx context.Context, req *proto.Nodes) (*p
 	if !Contains(s.NodeAddresses, strings.Trim(req.GetPort(), newLine)) {
 
 		s.NodeAddresses = append(s.NodeAddresses, req.GetPort())
+		sort.Strings(s.NodeAddresses)
 		fmt.Println("Appended a node " + req.GetPort() + " to my known addresses")
 
 	}
@@ -290,6 +307,8 @@ func (s *ReplicationServer) Heartbeat(ctx context.Context, req *proto.Nodes) (*p
 func (s *ReplicationServer) start_server() {
 
 	s.FindNodesAndOwnPort()
+	s.NodeAddresses = append(s.NodeAddresses, s.ownAddress)
+	sort.Strings(s.NodeAddresses)
 	grpcServer := grpc.NewServer()
 	listener, err := net.Listen("tcp", s.ownAddress)
 	if err != nil {
@@ -310,7 +329,6 @@ func (s *ReplicationServer) start_server() {
 		s.InitiateHeartbeat()
 
 		fmt.Println("Leader is : " + s.leaderAddress)
-		time.Sleep(10 * time.Second)
 
 	}
 

@@ -16,6 +16,7 @@ message BidAcknowledgement {
 }
 message ShowResult {
     string Result = 1;
+    repeated string Nodeports = 2;
 }
 
 message Nodes {

@@ -15,7 +15,7 @@ import (
 
 var id int32
 var currentConnection string
-var ports = []string{":5000"}
+var ports []string
 var connecter proto.ReplicationClient
 var newLine string
 
@@ -34,6 +34,12 @@ func main() {
 	}
 	log.SetOutput(file)
 
+	fmt.Print("Starting address is localhost:")
+	fmt.Scan(&currentConnection)
+	currentConnection = ":" + currentConnection
+	ports = append(ports, currentConnection)
+	fmt.Println(ports)
+
 	for {
 
 		var command string
@@ -44,11 +50,9 @@ func main() {
 
 		if connecter == nil {
 
-			fmt.Println("All servers down, call an ambulance")
+			fmt.Println("All known servers down, call an ambulance")
 			break
 		}
-
-		fmt.Println("I made it this far")
 
 		if command == "result" {
 
@@ -88,7 +92,17 @@ func Result() {
 		log.Fatalf("failed response on: %v", err)
 	}
 
-	fmt.Println(result.Result)
+	for _, port := range result.GetNodeports() {
+
+		if !Contains(ports, port) {
+
+			ports = append(ports, port)
+
+		}
+
+	}
+
+	fmt.Println(result.Result, ports)
 }
 
 // Sends the clients new bid, and prints the outcome.
@@ -107,8 +121,15 @@ func PlaceBid(enteredBid int32) {
 
 	}
 
-	ports = bidAcknowledgement.GetNodeports()
+	for _, port := range bidAcknowledgement.GetNodeports() {
 
+		if !Contains(ports, port) {
+
+			ports = append(ports, port)
+
+		}
+
+	}
 	fmt.Printf("Reminder that your ID is %v %v", id, newLine)
 
 	fmt.Println(bidAcknowledgement.Acknowledgement, " ", ports)
@@ -116,9 +137,11 @@ func PlaceBid(enteredBid int32) {
 
 func Connect() (connection proto.ReplicationClient) {
 
-	for _, address := range ports {
+	for addressIndex, address := range ports {
 
 		address = "localhost" + address
+		fmt.Println("Address here is", address)
+
 		fmt.Println("Tryna connect to", address)
 		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -129,6 +152,16 @@ func Connect() (connection proto.ReplicationClient) {
 		if err != nil {
 
 			fmt.Printf("Could not connect to address %v, trying next known %v", address, newLine)
+
+			if addressIndex != len(ports)-1 {
+
+				ports = append(ports[:addressIndex], ports[addressIndex+1:]...)
+
+			} else {
+
+				ports = ports[:addressIndex]
+			}
+
 			continue
 
 		}
@@ -142,4 +175,13 @@ func Connect() (connection proto.ReplicationClient) {
 	fmt.Println("Could not connect to any addresses")
 	return nil
 
+}
+
+func Contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
